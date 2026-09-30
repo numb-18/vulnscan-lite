@@ -1,0 +1,15 @@
+[
+  "tests/test_api.py::test_get_scan_history",
+  "tests/test_api.py::test_get_stats",
+  "tests/test_api.py::test_health_endpoint",
+  "tests/test_api.py::test_rate_limiting",
+  "tests/test_api.py::test_trigger_scan_empty_url",
+  "tests/test_api.py::test_trigger_scan_valid_url",
+  "tests/test_scanner.py::test_calculate_grade",
+  "tests/test_scanner.py::test_cms_detector_clean_surface",
+  "tests/test_scanner.py::test_cms_detector_with_wordpress_generator",
+  "tests/test_scanner.py::test_headers_analysis_with_mock",
+  "tests/test_scanner.py::test_pdf_report_generation",
+  "tests/test_scanner.py::test_remediation_retrieval",
+  "tests/test_scanner.py::test_semver_parser_and_outdated_check"
+]
