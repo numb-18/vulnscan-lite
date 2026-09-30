@@ -1,5 +1,9 @@
 from typing import Dict, Any, List, Tuple
-from .remediation import get_remediation_for_check
+
+try:
+    from .remediation import get_remediation_for_check
+except (ImportError, ValueError):
+    from remediation import get_remediation_for_check
 
 def calculate_grade(score: int) -> Tuple[str, str, str]:
     """
@@ -40,8 +44,7 @@ def compile_scan_results(
     failed_checks = []
     warning_checks = []
     
-    # Start with baseline of 60, add points from passes, deduct points from failures
-    # Maximum obtainable raw score: around 80 points above baseline.
+    # Base calculation
     raw_points = 50
     for c in all_checks:
         raw_points += c.get("points", 0)
