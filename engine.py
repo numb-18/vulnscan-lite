@@ -2,11 +2,18 @@ import re
 from urllib.parse import urlparse
 from typing import Dict, Any, Callable, Optional
 
-from .headers import analyze_headers
-from .ssl_tls import inspect_ssl_tls
-from .cms_detector import detect_cms_and_tech
-from .scoring import compile_scan_results
-from .pdf_generator import generate_pdf_report
+try:
+    from .headers import analyze_headers
+    from .ssl_tls import inspect_ssl_tls
+    from .cms_detector import detect_cms_and_tech
+    from .scoring import compile_scan_results
+    from .pdf_generator import generate_pdf_report
+except (ImportError, ValueError):
+    from headers import analyze_headers
+    from ssl_tls import inspect_ssl_tls
+    from cms_detector import detect_cms_and_tech
+    from scoring import compile_scan_results
+    from pdf_generator import generate_pdf_report
 
 def normalize_target_url(raw_url: str) -> str:
     """Ensures the target URL has a valid scheme and normalizes the format."""
