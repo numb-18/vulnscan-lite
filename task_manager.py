@@ -4,10 +4,20 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, Any, Optional
 
 from config import USE_CELERY, MAX_CONCURRENT_SCANS
-from data.database import (
-    create_scan_record, update_scan_progress, complete_scan_record, get_scan
-)
-from scanner.engine import run_scan_pipeline, normalize_target_url
+
+try:
+    from data.database import (
+        create_scan_record, update_scan_progress, complete_scan_record, get_scan
+    )
+except ModuleNotFoundError:
+    from database import (
+        create_scan_record, update_scan_progress, complete_scan_record, get_scan
+    )
+
+try:
+    from scanner.engine import run_scan_pipeline, normalize_target_url
+except ModuleNotFoundError:
+    from engine import run_scan_pipeline, normalize_target_url
 
 logger = logging.getLogger("vulnscan.queue")
 executor = ThreadPoolExecutor(max_workers=MAX_CONCURRENT_SCANS, thread_name_prefix="vulnscan-worker")
