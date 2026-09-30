@@ -1,10 +1,10 @@
 import os
+import time
 import logging
 from pathlib import Path
+from collections import defaultdict
 from typing import Optional
 
-import time
-from collections import defaultdict
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -12,8 +12,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from config import HOST, PORT, DEBUG, STATIC_DIR, DB_PATH
-from data.database import init_db, get_scan, list_scan_history, get_summary_stats
-from queue_service.task_manager import enqueue_scan_task
+
+try:
+    from data.database import init_db, get_scan, list_scan_history, get_summary_stats
+except ModuleNotFoundError:
+    from database import init_db, get_scan, list_scan_history, get_summary_stats
+
+try:
+    from queue_service.task_manager import enqueue_scan_task
+except ModuleNotFoundError:
+    from task_manager import enqueue_scan_task
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger("vulnscan.api")
@@ -25,7 +33,6 @@ client_scan_requests = defaultdict(list)
 
 def check_rate_limit(client_ip: str):
     now = time.time()
-    # Filter timestamps within active sliding window
     timestamps = [t for t in client_scan_requests[client_ip] if now - t < RATE_LIMIT_WINDOW_SECONDS]
     if len(timestamps) >= RATE_LIMIT_MAX_REQUESTS:
         retry_after = int(RATE_LIMIT_WINDOW_SECONDS - (now - timestamps[0]))
@@ -68,7 +75,6 @@ async def health_check():
 async def trigger_scan(payload: ScanRequest, request: Request):
     """
     Trigger a new asynchronous security posture scan.
-    Returns the scan UUID and initial status.
     Protected by IP rate limiting to prevent abuse.
     """
     client_ip = request.client.host if request.client else "127.0.0.1"
@@ -98,9 +104,7 @@ async def trigger_scan(payload: ScanRequest, request: Request):
 
 @app.get("/api/scan/{scan_id}/status")
 async def get_scan_status(scan_id: str):
-    """
-    Poll the current execution status and progress percentage of a scan.
-    """
+    """Poll execution status and progress of a scan."""
     scan = get_scan(scan_id)
     if not scan:
         raise HTTPException(status_code=404, detail="Scan ID not found.")
@@ -121,9 +125,7 @@ async def get_scan_status(scan_id: str):
 
 @app.get("/api/scan/{scan_id}/report")
 async def get_scan_report(scan_id: str):
-    """
-    Retrieve full findings, security checks, and remediation guidance for a completed scan.
-    """
+    """Retrieve full findings for a completed scan."""
     scan = get_scan(scan_id)
     if not scan:
         raise HTTPException(status_code=404, detail="Scan ID not found.")
@@ -160,16 +162,13 @@ async def get_scan_report(scan_id: str):
 
 @app.get("/api/scan/{scan_id}/pdf")
 async def download_scan_pdf(scan_id: str):
-    """
-    Download the generated professional PDF security audit report.
-    """
+    """Download the generated PDF security audit report."""
     scan = get_scan(scan_id)
     if not scan:
         raise HTTPException(status_code=404, detail="Scan ID not found.")
         
     pdf_path = scan.get("pdf_path")
     if not pdf_path or not Path(pdf_path).exists():
-        # Check fallback in reports directory
         fallback_path = Path(__file__).resolve().parent / "reports" / f"vulnscan_{scan_id}.pdf"
         if fallback_path.exists():
             pdf_path = str(fallback_path)
@@ -184,30 +183,42 @@ async def download_scan_pdf(scan_id: str):
 
 @app.get("/api/history")
 async def get_scan_history(limit: int = 50):
-    """
-    List past scan history for trend monitoring and security posture improvement over time.
-    """
+    """List past scan history."""
     history = list_scan_history(limit=limit)
     return {"history": history, "count": len(history)}
 
 @app.get("/api/stats")
 async def get_dashboard_stats():
-    """
-    Aggregated scanner statistics: total scans, average score, and grade distributions.
-    """
+    """Aggregated scanner statistics."""
     return get_summary_stats()
 
-# Mount frontend static directory
+# Mount frontend static directory if exists
 if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 @app.get("/")
 async def serve_index():
-    """Serves the main single-page web dashboard."""
-    index_file = STATIC_DIR / "index.html"
-    if index_file.exists():
-        return FileResponse(str(index_file))
+    """Serves the main single-page web dashboard from static/ or root."""
+    for candidate in [STATIC_DIR / "index.html", Path(__file__).resolve().parent / "index.html"]:
+        if candidate.exists():
+            return FileResponse(str(candidate))
     return {"message": "VulnScan Lite API is running. UI index.html not found."}
+
+@app.get("/app.js")
+@app.get("/static/app.js")
+async def serve_app_js():
+    for candidate in [STATIC_DIR / "app.js", Path(__file__).resolve().parent / "app.js"]:
+        if candidate.exists():
+            return FileResponse(str(candidate), media_type="application/javascript")
+    raise HTTPException(status_code=404, detail="app.js not found")
+
+@app.get("/styles.css")
+@app.get("/static/styles.css")
+async def serve_styles_css():
+    for candidate in [STATIC_DIR / "styles.css", Path(__file__).resolve().parent / "styles.css"]:
+        if candidate.exists():
+            return FileResponse(str(candidate), media_type="text/css")
+    raise HTTPException(status_code=404, detail="styles.css not found")
 
 if __name__ == "__main__":
     import uvicorn
